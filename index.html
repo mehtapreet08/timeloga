@@ -174,17 +174,30 @@
     }
 
     function endCurrentSession() {
-      const logs = getLogs();
-      if (logs.length === 0) return alert("No sessions to end.");
-      const last = logs[logs.length - 1];
-      if (last && last.startTime && !last.endTime) {
-        last.endTime = formatTime(new Date());
-        saveLogs(logs);
-        renderLogs();
-      } else {
-        alert("No open session to end.");
-      }
-    }
+  const logs = getLogs();
+  if (logs.length === 0) return alert("No sessions to end.");
+  const last = logs[logs.length - 1];
+  
+  if (last && last.startTime && !last.endTime) {
+    last.endTime = formatTime(new Date());
+
+    // Immediately start a new session
+    const now = new Date();
+    const today = formatDate(now);
+    logs.push({
+      date: today,
+      startTime: formatTime(now),
+      endTime: "",
+      task: "",
+      rating: 0
+    });
+
+    saveLogs(logs);
+    renderLogs();
+  } else {
+    alert("No open session to end.");
+  }
+}
 
     function copyAndDelete() {
       const logs = getLogs();
