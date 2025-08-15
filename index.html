@@ -2,123 +2,99 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Time Logger</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Task Log</title>
 <style>
-    body { font-family: sans-serif; padding: 20px; background: #f9f9f9; }
-    h1 { font-size: 1.5em; }
-    button { padding: 8px 12px; margin-top: 10px; margin-right: 5px; }
-    ul { list-style: none; padding-left: 0; }
-    li { background: #fff; margin: 4px 0; padding: 6px; border: 1px solid #ddd; display: flex; gap: 8px; align-items: center; }
-    input.task { flex: 1; padding: 4px; }
-    .time { min-width: 140px; font-size: 0.9em; }
-    .stars { cursor: pointer; }
-    .star { font-size: 1.2em; color: #ccc; }
-    .star.filled { color: gold; }
+  body {
+    font-family: Arial, sans-serif;
+    max-width: 800px;
+    margin: auto;
+    padding: 1rem;
+    background: #f8f9fa;
+  }
+  h1 { text-align: center; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+  }
+  th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+  }
+  th {
+    background-color: #007BFF;
+    color: white;
+  }
+  tr:nth-child(even) {
+    background-color: #f2f2f2;
+  }
 </style>
-<link rel="manifest" href="manifest.json">
 </head>
 <body>
 
-<h1>Time Log</h1>
-<ul id="log"></ul>
-<button onclick="copyLogs()">Copy Logs</button>
-<button onclick="clearLog()">Clear All</button>
+<h1>Task Log</h1>
+<table id="taskTable">
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Time Range</th>
+      <th>Task</th>
+      <th>Productivity</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td colspan="4" style="text-align:center;">Loading...</td></tr>
+  </tbody>
+</table>
 
 <script>
-// ===== Main Logging Logic =====
-(function handleLog() {
-    let log = JSON.parse(localStorage.getItem('timeLog') || '[]');
+// ===== CONFIG =====
+const GITHUB_RAW_URL = "https://raw.githubusercontent.com/USERNAME/REPO/main/log.txt"; // Change this
 
-    if (!log.length || log[log.length - 1].end) {
-        log.push({ start: new Date().toLocaleString(), task: '', end: '', rating: 0 });
-    } else {
-        log[log.length - 1].end = new Date().toLocaleString();
-    }
+// ===== FETCH & DISPLAY =====
+async function loadLogs() {
+    try {
+        const response = await fetch(GITHUB_RAW_URL + "?t=" + Date.now()); // prevent cache
+        const text = await response.text();
 
-    saveLog(log);
-    renderLog();
-})();
+        const rows = text.trim().split("\n").map(line => {
+            const [startDate, startTime, task, endDate, endTime, rating] = line.split(/\t/);
+            const date = startDate.trim();
+            const timeRange = `${startTime.trim()} to ${endTime.trim()}`;
+            const productivity = rating ? rating.trim() : "";
+            return { date, timeRange, task: task.trim(), productivity };
+        });
 
-function renderLog() {
-    let log = JSON.parse(localStorage.getItem('timeLog') || '[]');
-    const ul = document.getElementById('log');
-    ul.innerHTML = '';
-
-    log.forEach((entry, index) => {
-        const li = document.createElement('li');
-
-        // Start Time
-        const startSpan = document.createElement('span');
-        startSpan.className = 'time';
-        startSpan.textContent = entry.start || '';
-
-        // Task Input
-        const taskInput = document.createElement('input');
-        taskInput.type = 'text';
-        taskInput.className = 'task';
-        taskInput.value = entry.task || '';
-        taskInput.placeholder = 'Task (optional)';
-        taskInput.oninput = () => {
-            entry.task = taskInput.value;
-            saveLog(log);
-        };
-
-        // End Time
-        const endSpan = document.createElement('span');
-        endSpan.className = 'time';
-        endSpan.textContent = entry.end || '';
-
-        // Rating Stars
-        const starsDiv = document.createElement('div');
-        starsDiv.className = 'stars';
-        for (let i = 1; i <= 5; i++) {
-            const star = document.createElement('span');
-            star.className = 'star' + (i <= entry.rating ? ' filled' : '');
-            star.textContent = '★';
-            star.onclick = () => {
-                entry.rating = i;
-                saveLog(log);
-                renderLog();
-            };
-            starsDiv.appendChild(star);
-        }
-
-        li.appendChild(startSpan);
-        li.appendChild(taskInput);
-        li.appendChild(endSpan);
-        li.appendChild(starsDiv);
-
-        ul.appendChild(li);
-    });
-}
-
-function saveLog(log) {
-    localStorage.setItem('timeLog', JSON.stringify(log));
-}
-
-function clearLog() {
-    if (confirm('Clear all logs?')) {
-        localStorage.removeItem('timeLog');
-        renderLog();
+        renderTable(rows);
+    } catch (err) {
+        console.error("Error loading logs:", err);
+        document.querySelector("#taskTable tbody").innerHTML =
+            `<tr><td colspan="4" style="text-align:center;color:red;">Failed to load logs</td></tr>`;
     }
 }
 
-function copyLogs() {
-    let log = JSON.parse(localStorage.getItem('timeLog') || '[]');
-    if (!log.length) return;
+function renderTable(rows) {
+    const tbody = document.querySelector("#taskTable tbody");
+    tbody.innerHTML = rows.map(r =>
+        `<tr>
+            <td>${r.date}</td>
+            <td>${r.timeRange}</td>
+            <td>${r.task}</td>
+            <td>${r.productivity}</td>
+        </tr>`
+    ).join("");
+}
 
-    const text = log.map(e => `${e.start}\t${e.task}\t${e.end}\t${e.rating}`).join('\n');
-    navigator.clipboard.writeText(text).then(() => {
-        alert('Logs copied to clipboard.');
-        localStorage.removeItem('timeLog');
-        renderLog();
+// ===== SERVICE WORKER REGISTER =====
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").then(reg => {
+        console.log("Service Worker registered", reg);
     });
 }
 
-// ===== PWA Offline Support =====
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(err => console.error('SW registration failed', err));
-}
+// Load on page open
+loadLogs();
 </script>
 
 </body>
