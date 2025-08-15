@@ -1,20 +1,49 @@
-function renderLog() {
-    let log = JSON.parse(localStorage.getItem('timeLog') || '[]');
-    const ul = document.getElementById('log');
-    ul.innerHTML = '';
+const CACHE_NAME = "task-tracker-cache-v2";
+const OFFLINE_URLS = [
+  "/",             // index.html
+  "/index.html",
+  "/style.css",
+  "/script.js",
+  "/favicon.ico"
+];
 
-    log.forEach(entry => {
-        const li = document.createElement('li');
+// Install Service Worker
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(OFFLINE_URLS))
+  );
+  self.skipWaiting();
+});
 
-        let start = new Date(entry.start);
-        let end = new Date(entry.end);
-        let dateStr = start.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-        let startStr = start.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-        let endStr = end.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+// Activate Service Worker
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cache) => {
+          if (cache !== CACHE_NAME) {
+            return caches.delete(cache);
+          }
+        })
+      );
+    })
+  );
+  self.clients.claim();
+});
 
-        let ratingStr = entry.rating ? `⭐${entry.rating}` : '';
-
-        li.textContent = `${dateStr}  ${startStr} – ${endStr}  ${entry.task || ''}  ${ratingStr}`;
-        ul.appendChild(li);
-    });
-}
+// Fetch: Serve from Cache First
+self.addEventListener("fetch", (event) => {
+  event.respondWith(
+    caches.match(event.request).then((response) => {
+      return (
+        response ||
+        fetch(event.request).catch(() => {
+          // If offline and no cache, fallback to index.html
+          if (event.request.mode === "navigate") {
+            return caches.match("/index.html");
+          }
+        })
+      );
+    })
+  );
+});
