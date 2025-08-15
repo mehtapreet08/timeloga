@@ -1,49 +1,29 @@
-const CACHE_NAME = "task-tracker-cache-v2";
-const OFFLINE_URLS = [
-  "/",             // index.html
-  "/index.html",
-  "/style.css",
-  "/script.js",
-  "/favicon.ico"
+const CACHE_NAME = 'time-logger-cache-v1';
+const ASSETS = [
+  './',
+  './index.html',
+  './manifest.json'
 ];
 
-// Install Service Worker
-self.addEventListener("install", (event) => {
+// Install
+self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(OFFLINE_URLS))
+    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
   );
-  self.skipWaiting();
 });
 
-// Activate Service Worker
-self.addEventListener("activate", (event) => {
+// Activate
+self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            return caches.delete(cache);
-          }
-        })
-      );
-    })
+    caches.keys().then(keys => Promise.all(
+      keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+    ))
   );
-  self.clients.claim();
 });
 
-// Fetch: Serve from Cache First
-self.addEventListener("fetch", (event) => {
+// Fetch
+self.addEventListener('fetch', event => {
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return (
-        response ||
-        fetch(event.request).catch(() => {
-          // If offline and no cache, fallback to index.html
-          if (event.request.mode === "navigate") {
-            return caches.match("/index.html");
-          }
-        })
-      );
-    })
+    caches.match(event.request).then(res => res || fetch(event.request))
   );
 });
