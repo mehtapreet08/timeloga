@@ -13,7 +13,8 @@
     .star { cursor: pointer; font-size: 20px; color: lightgray; }
     .star.selected { color: gold; }
     button { padding: 10px 15px; margin-top: 10px; background: #007BFF; color: white; border: none; cursor: pointer; border-radius: 5px; }
-    button:hover { background: #0056b3; }
+    button:disabled { background: gray; cursor: not-allowed; }
+    button:hover:enabled { background: #0056b3; }
 </style>
 </head>
 <body>
@@ -34,7 +35,7 @@
     <tbody></tbody>
 </table>
 
-<button onclick="copyLogs()">Copy Logs & Redirect</button>
+<button id="copyBtn" onclick="copyLogs()" disabled>Copy Logs & Redirect</button>
 
 <script>
 let logs = JSON.parse(localStorage.getItem('timeLogs')) || [];
@@ -62,7 +63,7 @@ function addLogEntry() {
     }
     localStorage.setItem('timeLogs', JSON.stringify(logs));
     renderLogs();
-    if (logs[logs.length - 1].endTime) addLogEntry(); // Auto new start after end
+    if (logs[logs.length - 1].endTime) addLogEntry();
 }
 function renderLogs() {
     let tbody = document.querySelector('#logTable tbody');
@@ -73,11 +74,12 @@ function renderLogs() {
             <td>${log.date}</td>
             <td>${log.startTime}</td>
             <td>${log.endTime}</td>
-            <td><input type="text" value="${log.task}" onchange="updateTask(${index}, this.value)"></td>
-            <td>${renderStars(index, log.rating)}</td>
+            <td><input type="text" value="${log.task || ''}" onchange="updateTask(${index}, this.value)"></td>
+            <td>${renderStars(index, log.rating || 0)}</td>
         `;
         tbody.appendChild(row);
     });
+    toggleCopyButton();
 }
 function renderStars(index, rating) {
     let stars = '';
@@ -87,19 +89,38 @@ function renderStars(index, rating) {
     return stars;
 }
 function updateTask(index, value) {
-    logs[index].task = value;
+    logs[index].task = value.trim();
     localStorage.setItem('timeLogs', JSON.stringify(logs));
+    toggleCopyButton();
 }
 function setRating(index, rating) {
     logs[index].rating = rating;
     localStorage.setItem('timeLogs', JSON.stringify(logs));
     renderLogs();
 }
+function allLogsValid() {
+    return logs.length > 0 && logs.every(l => l.task.trim() !== '' && l.rating > 0);
+}
+function toggleCopyButton() {
+    document.getElementById('copyBtn').disabled = !allLogsValid();
+}
 function copyLogs() {
+    if (!allLogsValid()) return;
+    // Fill last end time if missing
+    if (!logs[logs.length - 1].endTime) {
+        logs[logs.length - 1].endTime = formatTime(new Date());
+    }
+    // Prepare copy text
     let copyText = logs.map(l => `${l.date}, ${l.startTime}, ${l.endTime}, ${l.task}, ${l.rating}`).join('\n');
     navigator.clipboard.writeText(copyText).then(() => {
+        // Clear all copied logs
         logs = [];
         localStorage.setItem('timeLogs', JSON.stringify(logs));
+        // Start a new log entry immediately
+        let now = new Date();
+        logs.push({ date: formatDate(now), startTime: formatTime(now), endTime: '', task: '', rating: 0 });
+        localStorage.setItem('timeLogs', JSON.stringify(logs));
+        renderLogs();
         window.location.href = redirectLink;
     });
 }
