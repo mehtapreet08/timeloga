@@ -1,101 +1,86 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Task Log</title>
-<style>
-  body {
-    font-family: Arial, sans-serif;
-    max-width: 800px;
-    margin: auto;
-    padding: 1rem;
-    background: #f8f9fa;
-  }
-  h1 { text-align: center; }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 1rem;
-  }
-  th, td {
-    border: 1px solid #ddd;
-    padding: 8px;
-  }
-  th {
-    background-color: #007BFF;
-    color: white;
-  }
-  tr:nth-child(even) {
-    background-color: #f2f2f2;
-  }
-</style>
+    <meta charset="UTF-8">
+    <title>Offline Task Logger</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background-color: #f4f4f4; }
+        input, select { padding: 5px; margin: 5px; }
+    </style>
 </head>
 <body>
+    <h1>Offline Task Logger</h1>
 
-<h1>Task Log</h1>
-<table id="taskTable">
-  <thead>
-    <tr>
-      <th>Date</th>
-      <th>Time Range</th>
-      <th>Task</th>
-      <th>Productivity</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr><td colspan="4" style="text-align:center;">Loading...</td></tr>
-  </tbody>
-</table>
+    <form id="taskForm">
+        <input type="date" id="startDate" required>
+        <input type="time" id="startTime" required>
+        <input type="time" id="endTime" required>
+        <input type="text" id="task" placeholder="Task description" required>
+        <select id="rating" required>
+            <option value="">Productivity rating</option>
+            <option value="1">1 - Very Low</option>
+            <option value="2">2 - Low</option>
+            <option value="3">3 - Medium</option>
+            <option value="4">4 - High</option>
+            <option value="5">5 - Excellent</option>
+        </select>
+        <button type="submit">Add Task</button>
+    </form>
 
-<script>
-// ===== CONFIG =====
-const GITHUB_RAW_URL = "https://raw.githubusercontent.com/USERNAME/REPO/main/log.txt"; // Change this
+    <table id="logsTable">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Task</th>
+                <th>Productivity</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
 
-// ===== FETCH & DISPLAY =====
-async function loadLogs() {
-    try {
-        const response = await fetch(GITHUB_RAW_URL + "?t=" + Date.now()); // prevent cache
-        const text = await response.text();
+    <script>
+        function loadLogs() {
+            const logs = JSON.parse(localStorage.getItem("taskLogs") || "[]");
+            const tbody = document.querySelector("#logsTable tbody");
+            tbody.innerHTML = "";
 
-        const rows = text.trim().split("\n").map(line => {
-            const [startDate, startTime, task, endDate, endTime, rating] = line.split(/\t/);
-            const date = startDate.trim();
-            const timeRange = `${startTime.trim()} to ${endTime.trim()}`;
-            const productivity = rating ? rating.trim() : "";
-            return { date, timeRange, task: task.trim(), productivity };
+            logs.forEach(log => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td>${log.date}</td>
+                    <td>${log.start_time} to ${log.end_time}</td>
+                    <td>${log.task}</td>
+                    <td>${log.rating}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        document.getElementById("taskForm").addEventListener("submit", function(e) {
+            e.preventDefault();
+
+            const log = {
+                date: document.getElementById("startDate").value,
+                start_time: document.getElementById("startTime").value,
+                end_time: document.getElementById("endTime").value,
+                task: document.getElementById("task").value.trim(),
+                rating: document.getElementById("rating").value
+            };
+
+            const logs = JSON.parse(localStorage.getItem("taskLogs") || "[]");
+            logs.push(log);
+            localStorage.setItem("taskLogs", JSON.stringify(logs));
+
+            loadLogs();
+            this.reset();
         });
 
-        renderTable(rows);
-    } catch (err) {
-        console.error("Error loading logs:", err);
-        document.querySelector("#taskTable tbody").innerHTML =
-            `<tr><td colspan="4" style="text-align:center;color:red;">Failed to load logs</td></tr>`;
-    }
-}
-
-function renderTable(rows) {
-    const tbody = document.querySelector("#taskTable tbody");
-    tbody.innerHTML = rows.map(r =>
-        `<tr>
-            <td>${r.date}</td>
-            <td>${r.timeRange}</td>
-            <td>${r.task}</td>
-            <td>${r.productivity}</td>
-        </tr>`
-    ).join("");
-}
-
-// ===== SERVICE WORKER REGISTER =====
-if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js").then(reg => {
-        console.log("Service Worker registered", reg);
-    });
-}
-
-// Load on page open
-loadLogs();
-</script>
-
+        // Load logs on page load
+        loadLogs();
+    </script>
 </body>
 </html>
