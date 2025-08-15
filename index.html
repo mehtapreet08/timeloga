@@ -1,86 +1,130 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Offline Task Logger</title>
-    <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-        th { background-color: #f4f4f4; }
-        input, select { padding: 5px; margin: 5px; }
-    </style>
+  <meta charset="UTF-8">
+  <title>Offline Time Logger</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: auto; padding: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    .stars span { cursor: pointer; font-size: 20px; }
+    button { margin-top: 10px; padding: 8px 12px; cursor: pointer; }
+    input { width: 100%; padding: 4px; }
+  </style>
 </head>
 <body>
-    <h1>Offline Task Logger</h1>
+  <h2>Offline Time Logger</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Start Time</th>
+        <th>End Time</th>
+        <th>Task</th>
+        <th>Productivity</th>
+      </tr>
+    </thead>
+    <tbody id="logTable"></tbody>
+  </table>
 
-    <form id="taskForm">
-        <input type="date" id="startDate" required>
-        <input type="time" id="startTime" required>
-        <input type="time" id="endTime" required>
-        <input type="text" id="task" placeholder="Task description" required>
-        <select id="rating" required>
-            <option value="">Productivity rating</option>
-            <option value="1">1 - Very Low</option>
-            <option value="2">2 - Low</option>
-            <option value="3">3 - Medium</option>
-            <option value="4">4 - High</option>
-            <option value="5">5 - Excellent</option>
-        </select>
-        <button type="submit">Add Task</button>
-    </form>
+  <button id="copyLogs">Copy & Delete Logs</button>
 
-    <table id="logsTable">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Time</th>
-                <th>Task</th>
-                <th>Productivity</th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-    </table>
+  <script>
+    const logKey = "offlineTimeLogs";
 
-    <script>
-        function loadLogs() {
-            const logs = JSON.parse(localStorage.getItem("taskLogs") || "[]");
-            const tbody = document.querySelector("#logsTable tbody");
-            tbody.innerHTML = "";
+    function getLogs() {
+      return JSON.parse(localStorage.getItem(logKey) || "[]");
+    }
 
-            logs.forEach(log => {
-                const tr = document.createElement("tr");
-                tr.innerHTML = `
-                    <td>${log.date}</td>
-                    <td>${log.start_time} to ${log.end_time}</td>
-                    <td>${log.task}</td>
-                    <td>${log.rating}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
+    function saveLogs(logs) {
+      localStorage.setItem(logKey, JSON.stringify(logs));
+    }
 
-        document.getElementById("taskForm").addEventListener("submit", function(e) {
-            e.preventDefault();
+    function formatDate(d) {
+      return d.toLocaleDateString("en-GB");
+    }
 
-            const log = {
-                date: document.getElementById("startDate").value,
-                start_time: document.getElementById("startTime").value,
-                end_time: document.getElementById("endTime").value,
-                task: document.getElementById("task").value.trim(),
-                rating: document.getElementById("rating").value
-            };
+    function formatTime(d) {
+      return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    }
 
-            const logs = JSON.parse(localStorage.getItem("taskLogs") || "[]");
-            logs.push(log);
-            localStorage.setItem("taskLogs", JSON.stringify(logs));
+    function renderLogs() {
+      const logs = getLogs();
+      const tbody = document.getElementById("logTable");
+      tbody.innerHTML = "";
+      logs.forEach((log, index) => {
+        const tr = document.createElement("tr");
 
-            loadLogs();
-            this.reset();
+        tr.innerHTML = `
+          <td>${log.date}</td>
+          <td>${log.startTime || ""}</td>
+          <td>${log.endTime || ""}</td>
+          <td><input value="${log.task || ""}" data-index="${index}" class="taskInput"></td>
+          <td class="stars" data-index="${index}">${renderStars(log.rating || 0)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.querySelectorAll(".taskInput").forEach(input => {
+        input.addEventListener("input", e => {
+          const logs = getLogs();
+          logs[e.target.dataset.index].task = e.target.value;
+          saveLogs(logs);
         });
+      });
 
-        // Load logs on page load
-        loadLogs();
-    </script>
+      document.querySelectorAll(".stars span").forEach(star => {
+        star.addEventListener("click", e => {
+          const index = e.target.parentElement.dataset.index;
+          const rating = e.target.dataset.value;
+          const logs = getLogs();
+          logs[index].rating = Number(rating);
+          saveLogs(logs);
+          renderLogs();
+        });
+      });
+    }
+
+    function renderStars(rating) {
+      let html = "";
+      for (let i = 1; i <= 5; i++) {
+        html += `<span data-value="${i}">${i <= rating ? "★" : "☆"}</span>`;
+      }
+      return html;
+    }
+
+    function logTime() {
+      const now = new Date();
+      const today = formatDate(now);
+      let logs = getLogs();
+      let log = logs.find(l => l.date === today);
+
+      if (!log) {
+        logs.push({ date: today, startTime: formatTime(now) });
+      } else {
+        log.endTime = formatTime(now);
+      }
+      saveLogs(logs);
+      renderLogs();
+    }
+
+    document.getElementById("copyLogs").addEventListener("click", () => {
+      const logs = getLogs();
+      if (logs.length === 0) return alert("No logs to copy!");
+
+      const text = logs.map(l =>
+        `${l.date}, ${l.startTime || ""}, ${l.endTime || ""}, ${l.task || ""}, ${l.rating || ""}`
+      ).join("\n");
+
+      navigator.clipboard.writeText(text).then(() => {
+        localStorage.removeItem(logKey);
+        renderLogs();
+        alert("Logs copied and deleted!");
+      });
+    });
+
+    logTime();
+    renderLogs();
+  </script>
 </body>
 </html>
