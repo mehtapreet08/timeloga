@@ -5,38 +5,93 @@
   <title>Offline Time Logger</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: Arial, sans-serif; max-width: 900px; margin: auto; padding: 20px; }
-    h2 { margin-bottom: 8px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-    th { background: #f7f7f7; }
-    input { width: 100%; padding: 4px; border: 1px solid #ccc; }
-    .stars span { cursor: pointer; font-size: 20px; user-select: none; }
-    .controls { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
-    button { padding: 8px 12px; cursor: pointer; border: 1px solid #ccc; background: #fff; }
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 900px;
+      margin: auto;
+      padding: 20px;
+    }
+    h2 {
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    .controls {
+      margin-bottom: 12px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    button {
+      padding: 10px 14px;
+      cursor: pointer;
+      border: 1px solid #ccc;
+      background: #fff;
+      border-radius: 6px;
+      flex: 1;
+      min-width: 120px;
+    }
+    .table-wrapper {
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 600px; /* For horizontal scroll on small screens */
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background: #f7f7f7;
+    }
+    input {
+      width: 100%;
+      padding: 6px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .stars span {
+      cursor: pointer;
+      font-size: 24px; /* bigger for touch */
+      user-select: none;
+      padding: 2px;
+    }
+    @media (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+      button {
+        font-size: 14px;
+        padding: 8px 10px;
+      }
+    }
   </style>
 </head>
 <body>
   <h2>Offline Time Logger</h2>
   <div class="controls">
-    <!-- Optional convenience buttons so you don’t need to reload -->
     <button id="startNew">Start New Session</button>
     <button id="endCurrent">End Current Session</button>
     <button id="copyLogs">Copy & Delete Logs</button>
   </div>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Date (dd/mm/yyyy)</th>
-        <th>Start Time</th>
-        <th>End Time</th>
-        <th>Task</th>
-        <th>Productivity</th>
-      </tr>
-    </thead>
-    <tbody id="logTable"></tbody>
-  </table>
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Date (dd/mm/yyyy)</th>
+          <th>Start Time</th>
+          <th>End Time</th>
+          <th>Task</th>
+          <th>Productivity</th>
+        </tr>
+      </thead>
+      <tbody id="logTable"></tbody>
+    </table>
+  </div>
 
   <script>
     const LOG_KEY = "offlineTimeLogs";
@@ -46,7 +101,7 @@
 
     const formatDate = (d) => d.toLocaleDateString("en-GB"); // dd/mm/yyyy
     const formatTime = (d) =>
-      d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }); // hh:mm AM/PM
+      d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
 
     function renderStars(rating) {
       let html = "";
@@ -71,16 +126,14 @@
         tbody.appendChild(tr);
       });
 
-      // Task edits persist immediately
       document.querySelectorAll(".taskInput").forEach((input) => {
         input.addEventListener("input", (e) => {
           const logs = getLogs();
-          logs[e.target.dataset.index].task = e.target.value;
+          logs[e.target.dataset.index].task = e.target.value.trim();
           saveLogs(logs);
         });
       });
 
-      // Star clicks persist immediately
       document.querySelectorAll(".stars span").forEach((star) => {
         star.addEventListener("click", (e) => {
           const idx = Number(e.target.parentElement.dataset.index);
@@ -93,7 +146,6 @@
       });
     }
 
-    // Core logic: alternate end -> new start -> end ...
     function logOnLoadOpen() {
       const now = new Date();
       const today = formatDate(now);
@@ -101,13 +153,10 @@
       const last = logs[logs.length - 1];
 
       if (!last || last.date !== today) {
-        // First session of today (or no logs yet)
         logs.push({ date: today, startTime: formatTime(now), endTime: "", task: "", rating: 0 });
       } else if (last.startTime && !last.endTime) {
-        // Close the current open session
         last.endTime = formatTime(now);
       } else {
-        // Last session already closed -> start a new one
         logs.push({ date: today, startTime: formatTime(now), endTime: "", task: "", rating: 0 });
       }
 
@@ -115,7 +164,6 @@
       renderLogs();
     }
 
-    // Optional convenience: start a new session without reloading
     function startNewSession() {
       const now = new Date();
       const today = formatDate(now);
@@ -125,7 +173,6 @@
       renderLogs();
     }
 
-    // Optional convenience: end the current open session (if any)
     function endCurrentSession() {
       const logs = getLogs();
       if (logs.length === 0) return alert("No sessions to end.");
@@ -139,13 +186,21 @@
       }
     }
 
-    // Copy in the required format and clear storage
     function copyAndDelete() {
       const logs = getLogs();
       if (logs.length === 0) return alert("No logs to copy!");
+
+      // Validation for task and rating
+      const missing = logs.filter(l => !l.task || l.rating === 0);
+      if (missing.length > 0) {
+        alert("Please fill Task and select a Productivity rating (1–5) for all rows before copying.");
+        return;
+      }
+
       const text = logs
-        .map((l) => `${l.date}, ${l.startTime || ""}, ${l.endTime || ""}, ${l.task || ""}, ${l.rating || ""}`)
+        .map((l) => `${l.date}, ${l.startTime || ""}, ${l.endTime || ""}, ${l.task}, ${l.rating}`)
         .join("\n");
+
       navigator.clipboard.writeText(text).then(() => {
         localStorage.removeItem(LOG_KEY);
         renderLogs();
@@ -153,12 +208,10 @@
       });
     }
 
-    // Wire buttons
     document.getElementById("copyLogs").addEventListener("click", copyAndDelete);
     document.getElementById("startNew").addEventListener("click", startNewSession);
     document.getElementById("endCurrent").addEventListener("click", endCurrentSession);
 
-    // Auto-log on open (the fix you wanted)
     logOnLoadOpen();
     renderLogs();
   </script>
