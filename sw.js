@@ -1,39 +1,37 @@
-const CACHE_NAME = 'time-logger-cache-v2';
-const ASSETS = [
-  './',
-  './index.html',
-  './manifest.json'
+const CACHE_NAME = "task-log-v2";
+const OFFLINE_FILES = [
+  "./",
+  "./index.html"
 ];
 
-// Install
-self.addEventListener('install', event => {
+self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
+    caches.open(CACHE_NAME).then(cache => cache.addAll(OFFLINE_FILES))
   );
-  self.skipWaiting();
 });
 
-// Activate
-self.addEventListener('activate', event => {
+self.addEventListener("fetch", event => {
+  event.respondWith(
+    caches.match(event.request).then(cached => {
+      const fetchPromise = fetch(event.request)
+        .then(networkResponse => {
+          if (networkResponse && networkResponse.status === 200) {
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(event.request, networkResponse.clone());
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => cached);
+      return cached || fetchPromise;
+    })
+  );
+});
+
+self.addEventListener("activate", event => {
   event.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)))
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
     )
-  );
-  self.clients.claim();
-});
-
-// Fetch (Stale-While-Revalidate)
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request).then(cachedResponse => {
-      const fetchPromise = fetch(event.request).then(networkResponse => {
-        caches.open(CACHE_NAME).then(cache => {
-          cache.put(event.request, networkResponse.clone());
-        });
-        return networkResponse;
-      }).catch(() => cachedResponse);
-      return cachedResponse || fetchPromise;
-    })
   );
 });
