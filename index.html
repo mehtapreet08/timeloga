@@ -1,116 +1,111 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Time Logger</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body { font-family: Arial, sans-serif; padding: 10px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-        button { padding: 5px 10px; }
-        input[type="text"], select { width: 90%; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Offline Time Logger</title>
+<style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f4; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    th { background: #007BFF; color: white; }
+    input[type="text"] { width: 90%; padding: 5px; }
+    .star { cursor: pointer; font-size: 20px; color: lightgray; }
+    .star.selected { color: gold; }
+    button { padding: 10px 15px; margin-top: 10px; background: #007BFF; color: white; border: none; cursor: pointer; border-radius: 5px; }
+    button:hover { background: #0056b3; }
+</style>
 </head>
 <body>
+<h2>Offline Time Logger</h2>
+<label>Redirect Link after Copy: <input type="text" id="redirectLink"></label>
+<button onclick="saveRedirectLink()">Save Link</button>
 
-<h2>Time Logger</h2>
 <table id="logTable">
     <thead>
         <tr>
+            <th>Date</th>
             <th>Start Time</th>
             <th>End Time</th>
-            <th>Productivity</th>
             <th>Task</th>
-            <th>Actions</th>
+            <th>Productivity</th>
         </tr>
     </thead>
     <tbody></tbody>
 </table>
 
+<button onclick="copyLogs()">Copy Logs & Redirect</button>
+
 <script>
-    let logs = JSON.parse(localStorage.getItem("logs") || "[]");
+let logs = JSON.parse(localStorage.getItem('timeLogs')) || [];
+let redirectLink = localStorage.getItem('redirectLink') || "https://gemini.google.com/gem/4b5f9c40a65f/ace29c79bcec5ddc";
+document.getElementById('redirectLink').value = redirectLink;
 
-    function saveLogs() {
-        localStorage.setItem("logs", JSON.stringify(logs));
+function formatDate(d) {
+    return d.toLocaleDateString('en-GB');
+}
+function formatTime(d) {
+    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+function saveRedirectLink() {
+    redirectLink = document.getElementById('redirectLink').value;
+    localStorage.setItem('redirectLink', redirectLink);
+}
+function addLogEntry() {
+    let now = new Date();
+    let today = formatDate(now);
+
+    if (logs.length > 0 && !logs[logs.length - 1].endTime) {
+        logs[logs.length - 1].endTime = formatTime(now);
+    } else {
+        logs.push({ date: today, startTime: formatTime(now), endTime: '', task: '', rating: 0 });
     }
-
-    function renderLogs() {
-        const tbody = document.querySelector("#logTable tbody");
-        tbody.innerHTML = "";
-        logs.forEach((log, index) => {
-            const row = document.createElement("tr");
-
-            const startTd = document.createElement("td");
-            startTd.textContent = log.startTime;
-            row.appendChild(startTd);
-
-            const endTd = document.createElement("td");
-            endTd.textContent = log.endTime || "";
-            row.appendChild(endTd);
-
-            const prodTd = document.createElement("td");
-            const prodInput = document.createElement("input");
-            prodInput.type = "text";
-            prodInput.value = log.productivity || "";
-            prodInput.addEventListener("input", e => {
-                logs[index].productivity = e.target.value;
-                saveLogs();
-            });
-            prodTd.appendChild(prodInput);
-            row.appendChild(prodTd);
-
-            const taskTd = document.createElement("td");
-            const taskInput = document.createElement("input");
-            taskInput.type = "text";
-            taskInput.value = log.task || "";
-            taskInput.addEventListener("input", e => {
-                logs[index].task = e.target.value;
-                saveLogs();
-            });
-            taskTd.appendChild(taskInput);
-            row.appendChild(taskTd);
-
-            const actionTd = document.createElement("td");
-            const endBtn = document.createElement("button");
-            endBtn.textContent = "End Time";
-            endBtn.onclick = () => {
-                logs[index].endTime = new Date().toLocaleString();
-                saveLogs();
-                startNewLog();
-            };
-            actionTd.appendChild(endBtn);
-            row.appendChild(actionTd);
-
-            tbody.appendChild(row);
-        });
+    localStorage.setItem('timeLogs', JSON.stringify(logs));
+    renderLogs();
+    if (logs[logs.length - 1].endTime) addLogEntry(); // Auto new start after end
+}
+function renderLogs() {
+    let tbody = document.querySelector('#logTable tbody');
+    tbody.innerHTML = '';
+    logs.forEach((log, index) => {
+        let row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${log.date}</td>
+            <td>${log.startTime}</td>
+            <td>${log.endTime}</td>
+            <td><input type="text" value="${log.task}" onchange="updateTask(${index}, this.value)"></td>
+            <td>${renderStars(index, log.rating)}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+function renderStars(index, rating) {
+    let stars = '';
+    for (let i = 1; i <= 5; i++) {
+        stars += `<span class="star ${i <= rating ? 'selected' : ''}" onclick="setRating(${index}, ${i})">★</span>`;
     }
-
-    function startNewLog() {
-        logs.push({
-            startTime: new Date().toLocaleString(),
-            endTime: null,
-            productivity: "",
-            task: ""
-        });
-        saveLogs();
-        renderLogs();
-    }
-
-    function init() {
-        if (logs.length === 0) {
-            startNewLog();
-        } else {
-            let lastLog = logs[logs.length - 1];
-            if (lastLog.endTime) {
-                // Last log ended → auto start a new one
-                startNewLog();
-            }
-        }
-        renderLogs();
-    }
-
-    init();
+    return stars;
+}
+function updateTask(index, value) {
+    logs[index].task = value;
+    localStorage.setItem('timeLogs', JSON.stringify(logs));
+}
+function setRating(index, rating) {
+    logs[index].rating = rating;
+    localStorage.setItem('timeLogs', JSON.stringify(logs));
+    renderLogs();
+}
+function copyLogs() {
+    let copyText = logs.map(l => `${l.date}, ${l.startTime}, ${l.endTime}, ${l.task}, ${l.rating}`).join('\n');
+    navigator.clipboard.writeText(copyText).then(() => {
+        logs = [];
+        localStorage.setItem('timeLogs', JSON.stringify(logs));
+        window.location.href = redirectLink;
+    });
+}
+window.onload = function() {
+    addLogEntry();
+};
 </script>
-
 </body>
 </html>
