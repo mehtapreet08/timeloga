@@ -1,29 +1,20 @@
-const CACHE_NAME = 'time-logger-cache-v1';
-const ASSETS = [
-  './',
-  './index.html',
-  './manifest.json'
-];
+function renderLog() {
+    let log = JSON.parse(localStorage.getItem('timeLog') || '[]');
+    const ul = document.getElementById('log');
+    ul.innerHTML = '';
 
-// Install
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
-  );
-});
+    log.forEach(entry => {
+        const li = document.createElement('li');
 
-// Activate
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys => Promise.all(
-      keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
-    ))
-  );
-});
+        let start = new Date(entry.start);
+        let end = new Date(entry.end);
+        let dateStr = start.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        let startStr = start.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        let endStr = end.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
-// Fetch
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request).then(res => res || fetch(event.request))
-  );
-});
+        let ratingStr = entry.rating ? `⭐${entry.rating}` : '';
+
+        li.textContent = `${dateStr}  ${startStr} – ${endStr}  ${entry.task || ''}  ${ratingStr}`;
+        ul.appendChild(li);
+    });
+}
