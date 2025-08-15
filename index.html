@@ -1,31 +1,116 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Time Logger</title>
-  <link rel="stylesheet" href="style.css">
+    <title>Time Logger</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; padding: 10px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+        button { padding: 5px 10px; }
+        input[type="text"], select { width: 90%; }
+    </style>
 </head>
 <body>
-  <h1>Time Logger</h1>
-  
-  <button id="startBtn">Start Session</button>
-  <button id="endBtn">End Current Session</button>
-  
-  <table id="logTable">
+
+<h2>Time Logger</h2>
+<table id="logTable">
     <thead>
-      <tr>
-        <th>Date</th>
-        <th>Start</th>
-        <th>End</th>
-        <th>Task</th>
-        <th>Rating</th>
-        <th>Actions</th>
-      </tr>
+        <tr>
+            <th>Start Time</th>
+            <th>End Time</th>
+            <th>Productivity</th>
+            <th>Task</th>
+            <th>Actions</th>
+        </tr>
     </thead>
     <tbody></tbody>
-  </table>
-  
-  <script src="script.js"></script>
+</table>
+
+<script>
+    let logs = JSON.parse(localStorage.getItem("logs") || "[]");
+
+    function saveLogs() {
+        localStorage.setItem("logs", JSON.stringify(logs));
+    }
+
+    function renderLogs() {
+        const tbody = document.querySelector("#logTable tbody");
+        tbody.innerHTML = "";
+        logs.forEach((log, index) => {
+            const row = document.createElement("tr");
+
+            const startTd = document.createElement("td");
+            startTd.textContent = log.startTime;
+            row.appendChild(startTd);
+
+            const endTd = document.createElement("td");
+            endTd.textContent = log.endTime || "";
+            row.appendChild(endTd);
+
+            const prodTd = document.createElement("td");
+            const prodInput = document.createElement("input");
+            prodInput.type = "text";
+            prodInput.value = log.productivity || "";
+            prodInput.addEventListener("input", e => {
+                logs[index].productivity = e.target.value;
+                saveLogs();
+            });
+            prodTd.appendChild(prodInput);
+            row.appendChild(prodTd);
+
+            const taskTd = document.createElement("td");
+            const taskInput = document.createElement("input");
+            taskInput.type = "text";
+            taskInput.value = log.task || "";
+            taskInput.addEventListener("input", e => {
+                logs[index].task = e.target.value;
+                saveLogs();
+            });
+            taskTd.appendChild(taskInput);
+            row.appendChild(taskTd);
+
+            const actionTd = document.createElement("td");
+            const endBtn = document.createElement("button");
+            endBtn.textContent = "End Time";
+            endBtn.onclick = () => {
+                logs[index].endTime = new Date().toLocaleString();
+                saveLogs();
+                startNewLog();
+            };
+            actionTd.appendChild(endBtn);
+            row.appendChild(actionTd);
+
+            tbody.appendChild(row);
+        });
+    }
+
+    function startNewLog() {
+        logs.push({
+            startTime: new Date().toLocaleString(),
+            endTime: null,
+            productivity: "",
+            task: ""
+        });
+        saveLogs();
+        renderLogs();
+    }
+
+    function init() {
+        if (logs.length === 0) {
+            startNewLog();
+        } else {
+            let lastLog = logs[logs.length - 1];
+            if (lastLog.endTime) {
+                // Last log ended → auto start a new one
+                startNewLog();
+            }
+        }
+        renderLogs();
+    }
+
+    init();
+</script>
+
 </body>
 </html>
