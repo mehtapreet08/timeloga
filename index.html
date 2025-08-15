@@ -6,47 +6,121 @@
 <style>
     body { font-family: sans-serif; padding: 20px; background: #f9f9f9; }
     h1 { font-size: 1.5em; }
-    button { padding: 8px 12px; margin-top: 10px; }
+    button { padding: 8px 12px; margin-top: 10px; margin-right: 5px; }
     ul { list-style: none; padding-left: 0; }
-    li { background: #fff; margin: 4px 0; padding: 6px; border: 1px solid #ddd; }
+    li { background: #fff; margin: 4px 0; padding: 6px; border: 1px solid #ddd; display: flex; gap: 8px; align-items: center; }
+    input.task { flex: 1; padding: 4px; }
+    .time { min-width: 140px; font-size: 0.9em; }
+    .stars { cursor: pointer; }
+    .star { font-size: 1.2em; color: #ccc; }
+    .star.filled { color: gold; }
 </style>
+<link rel="manifest" href="manifest.json">
 </head>
 <body>
 
 <h1>Time Log</h1>
 <ul id="log"></ul>
-<button onclick="clearLog()">Clear Log</button>
+<button onclick="copyLogs()">Copy Logs</button>
+<button onclick="clearLog()">Clear All</button>
 
 <script>
-(function logTime() {
-    // Get stored log or create empty
+// ===== Main Logging Logic =====
+(function handleLog() {
     let log = JSON.parse(localStorage.getItem('timeLog') || '[]');
 
-    // Append current time
-    const now = new Date();
-    const timeString = now.toLocaleString();
-    log.push(timeString);
+    if (!log.length || log[log.length - 1].end) {
+        log.push({ start: new Date().toLocaleString(), task: '', end: '', rating: 0 });
+    } else {
+        log[log.length - 1].end = new Date().toLocaleString();
+    }
 
-    // Save back to localStorage
-    localStorage.setItem('timeLog', JSON.stringify(log));
-
-    // Render list
-    const ul = document.getElementById('log');
-    ul.innerHTML = '';
-    log.forEach(item => {
-        const li = document.createElement('li');
-        li.textContent = item;
-        ul.appendChild(li);
-    });
+    saveLog(log);
+    renderLog();
 })();
 
+function renderLog() {
+    let log = JSON.parse(localStorage.getItem('timeLog') || '[]');
+    const ul = document.getElementById('log');
+    ul.innerHTML = '';
+
+    log.forEach((entry, index) => {
+        const li = document.createElement('li');
+
+        // Start Time
+        const startSpan = document.createElement('span');
+        startSpan.className = 'time';
+        startSpan.textContent = entry.start || '';
+
+        // Task Input
+        const taskInput = document.createElement('input');
+        taskInput.type = 'text';
+        taskInput.className = 'task';
+        taskInput.value = entry.task || '';
+        taskInput.placeholder = 'Task (optional)';
+        taskInput.oninput = () => {
+            entry.task = taskInput.value;
+            saveLog(log);
+        };
+
+        // End Time
+        const endSpan = document.createElement('span');
+        endSpan.className = 'time';
+        endSpan.textContent = entry.end || '';
+
+        // Rating Stars
+        const starsDiv = document.createElement('div');
+        starsDiv.className = 'stars';
+        for (let i = 1; i <= 5; i++) {
+            const star = document.createElement('span');
+            star.className = 'star' + (i <= entry.rating ? ' filled' : '');
+            star.textContent = '★';
+            star.onclick = () => {
+                entry.rating = i;
+                saveLog(log);
+                renderLog();
+            };
+            starsDiv.appendChild(star);
+        }
+
+        li.appendChild(startSpan);
+        li.appendChild(taskInput);
+        li.appendChild(endSpan);
+        li.appendChild(starsDiv);
+
+        ul.appendChild(li);
+    });
+}
+
+function saveLog(log) {
+    localStorage.setItem('timeLog', JSON.stringify(log));
+}
+
 function clearLog() {
-    if (confirm('Clear all times?')) {
+    if (confirm('Clear all logs?')) {
         localStorage.removeItem('timeLog');
-        document.getElementById('log').innerHTML = '';
+        renderLog();
     }
+}
+
+function copyLogs() {
+    let log = JSON.parse(localStorage.getItem('timeLog') || '[]');
+    if (!log.length) return;
+
+    const text = log.map(e => `${e.start}\t${e.task}\t${e.end}\t${e.rating}`).join('\n');
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Logs copied to clipboard.');
+        localStorage.removeItem('timeLog');
+        renderLog();
+    });
+}
+
+// ===== PWA Offline Support =====
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(err => console.error('SW registration failed', err));
 }
 </script>
 
 </body>
 </html>
+
